@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>คำนวณยอดผ่อนบ้านต่อเดือน</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.75rem;
+      color: #2b6cb0;
+      margin-bottom: 1.75rem;
+      letter-spacing: 0.02em;
+    }
+
+    /* ---- Input card ---- */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.1);
+      padding: 1.75rem 2rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .field label {
+      display: block;
+      font-size: .875rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: .4rem;
+    }
+
+    .field input {
+      width: 100%;
+      padding: .55rem .85rem;
+      border: 1.5px solid #cbd5e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color .2s;
+    }
+
+    .field input:focus {
+      outline: none;
+      border-color: #3182ce;
+      box-shadow: 0 0 0 3px rgba(49,130,206,.15);
+    }
+
+    .field input.error { border-color: #e53e3e; }
+    .field .err-msg { color: #e53e3e; font-size: .78rem; margin-top: .3rem; }
+
+    .btn-row { margin-top: 1.5rem; display: flex; gap: .75rem; flex-wrap: wrap; }
+
+    button {
+      padding: .6rem 1.6rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    button:active { transform: scale(.97); }
+
+    .btn-calc  { background: #2b6cb0; color: #fff; }
+    .btn-reset { background: #e2e8f0; color: #4a5568; }
+    button:hover { opacity: .88; }
+
+    /* ---- Summary boxes ---- */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .summary-box {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 1.1rem 1.4rem;
+      text-align: center;
+    }
+
+    .summary-box .label {
+      font-size: .8rem;
+      color: #718096;
+      margin-bottom: .35rem;
+    }
+
+    .summary-box .value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #2b6cb0;
+    }
+
+    .summary-box.highlight .value { color: #c53030; }
+
+    /* ---- Table ---- */
+    .table-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.1);
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .table-header h2 { font-size: 1rem; color: #2d3748; }
+
+    .table-scroll { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .9rem;
+      min-width: 600px;
+    }
+
+    thead th {
+      background: #ebf4ff;
+      color: #2b6cb0;
+      font-weight: 700;
+      padding: .7rem 1rem;
+      text-align: right;
+      white-space: nowrap;
+    }
+    thead th:first-child { text-align: center; }
+
+    tbody tr:nth-child(even) { background: #f7fafc; }
+    tbody tr:hover { background: #ebf8ff; }
+
+    tbody td {
+      padding: .55rem 1rem;
+      text-align: right;
+      border-bottom: 1px solid #edf2f7;
+      white-space: nowrap;
+    }
+    tbody td:first-child { text-align: center; color: #718096; }
+
+    tfoot td {
+      padding: .65rem 1rem;
+      font-weight: 700;
+      text-align: right;
+      background: #ebf4ff;
+      color: #2b6cb0;
+      border-top: 2px solid #bee3f8;
+      white-space: nowrap;
+    }
+    tfoot td:first-child { text-align: center; }
+
+    /* ---- Hidden until calculated ---- */
+    .results { display: none; }
+    .results.visible { display: block; }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 480px) {
+      h1 { font-size: 1.3rem; }
+      .card { padding: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏠 คำนวณยอดผ่อนบ้านต่อเดือน</h1>
+
+    <!-- Input -->
+    <div class="card">
+      <div class="form-grid">
+        <div class="field" id="f-principal">
+          <label for="principal">ยอดเงินกู้บ้าน (บาท)</label>
+          <input type="number" id="principal" placeholder="เช่น 3000000" min="1" step="any" />
+          <div class="err-msg" id="err-principal"></div>
+        </div>
+        <div class="field" id="f-rate">
+          <label for="rate">อัตราดอกเบี้ยต่อปี (%)</label>
+          <input type="number" id="rate" placeholder="เช่น 6.5" min="0" step="any" />
+          <div class="err-msg" id="err-rate"></div>
+        </div>
+        <div class="field" id="f-years">
+          <label for="years">ระยะเวลาผ่อน (ปี)</label>
+          <input type="number" id="years" placeholder="เช่น 30" min="1" step="1" />
+          <div class="err-msg" id="err-years"></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-calc" onclick="calculate()">คำนวณ</button>
+        <button class="btn-reset" onclick="reset()">รีเซ็ต</button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results" id="results">
+      <!-- Summary -->
+      <div class="summary-grid" id="summary-grid">
+        <div class="summary-box">
+          <div class="label">ยอดเงินกู้</div>
+          <div class="value" id="s-principal">-</div>
+        </div>
+        <div class="summary-box">
+          <div class="label">ผ่อนต่อเดือน</div>
+          <div class="value" id="s-monthly">-</div>
+        </div>
+        <div class="summary-box highlight">
+          <div class="label">ดอกเบี้ยรวมทั้งหมด</div>
+          <div class="value" id="s-interest">-</div>
+        </div>
+        <div class="summary-box">
+          <div class="label">ยอดชำระรวมทั้งหมด</div>
+          <div class="value" id="s-total">-</div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-card">
+        <div class="table-header">
+          <h2 id="table-title">ตารางค่างวด</h2>
+          <button class="btn-reset" onclick="exportCSV()" style="font-size:.85rem;padding:.45rem 1rem;">⬇ ดาวน์โหลด CSV</button>
+        </div>
+        <div class="table-scroll">
+          <table id="amort-table">
+            <thead>
+              <tr>
+                <th>งวดที่</th>
+                <th>เงินต้น (บาท)</th>
+                <th>ดอกเบี้ย (บาท)</th>
+                <th>รวม (บาท)</th>
+                <th>คงเหลือ (บาท)</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+            <tfoot id="tfoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fmt = (n) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    let tableData = [];
+
+    function validate() {
+      let ok = true;
+
+      const fields = [
+        { id: 'principal', errId: 'err-principal', label: 'ยอดเงินกู้', isInt: false },
+        { id: 'rate',      errId: 'err-rate',      label: 'อัตราดอกเบี้ย', isInt: false, allowZero: true },
+        { id: 'years',     errId: 'err-years',     label: 'ระยะเวลา', isInt: true },
+      ];
+
+      fields.forEach(f => {
+        const input = document.getElementById(f.id);
+        const err   = document.getElementById(f.errId);
+        const val   = parseFloat(input.value);
+        const invalid = isNaN(val) || (!f.allowZero && val <= 0) || (f.allowZero && val < 0) || (f.isInt && !Number.isInteger(val));
+
+        input.classList.toggle('error', invalid);
+        err.textContent = invalid ? `กรุณากรอก${f.label}ที่ถูกต้อง` : '';
+        if (invalid) ok = false;
+      });
+
+      return ok;
+    }
+
+    function calculate() {
+      if (!validate()) return;
+
+      const principal   = parseFloat(document.getElementById('principal').value);
+      const annualRate  = parseFloat(document.getElementById('rate').value);
+      const years       = parseInt(document.getElementById('years').value, 10);
+
+      const monthlyRate = annualRate / 100 / 12;
+      const totalMonths = years * 12;
+
+      // Annuity formula
+      let monthlyPayment;
+      if (monthlyRate === 0) {
+        monthlyPayment = principal / totalMonths;
+      } else {
+        const r = monthlyRate;
+        const n = totalMonths;
+        monthlyPayment = principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+      }
+
+      let balance       = principal;
+      let totalInterest = 0;
+      tableData = [];
+
+      for (let month = 1; month <= totalMonths; month++) {
+        const interestPart = balance * monthlyRate;
+        let principalPart  = monthlyPayment - interestPart;
+        let payment        = monthlyPayment;
+
+        // Last month: adjust rounding
+        if (month === totalMonths) {
+          principalPart = balance;
+          payment = principalPart + interestPart;
+        }
+
+        balance -= principalPart;
+        if (balance < 0) balance = 0;
+        totalInterest += interestPart;
+
+        tableData.push({ month, principalPart, interestPart, payment, balance });
+      }
+
+      // Summary
+      document.getElementById('s-principal').textContent = fmt(principal) + ' ฿';
+      document.getElementById('s-monthly').textContent   = fmt(monthlyPayment) + ' ฿';
+      document.getElementById('s-interest').textContent  = fmt(totalInterest) + ' ฿';
+      document.getElementById('s-total').textContent     = fmt(principal + totalInterest) + ' ฿';
+      document.getElementById('table-title').textContent = `ตารางค่างวด (${totalMonths} งวด)`;
+
+      // Table body
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = tableData.map(r =>
+        `<tr>
+          <td>${r.month}</td>
+          <td>${fmt(r.principalPart)}</td>
+          <td>${fmt(r.interestPart)}</td>
+          <td>${fmt(r.payment)}</td>
+          <td>${fmt(r.balance)}</td>
+        </tr>`
+      ).join('');
+
+      // Table footer totals
+      const totalPrincipalPaid = tableData.reduce((s, r) => s + r.principalPart, 0);
+      const totalPayment       = tableData.reduce((s, r) => s + r.payment, 0);
+      document.getElementById('tfoot').innerHTML =
+        `<tr>
+          <td>รวม</td>
+          <td>${fmt(totalPrincipalPaid)}</td>
+          <td>${fmt(totalInterest)}</td>
+          <td>${fmt(totalPayment)}</td>
+          <td>0.00</td>
+        </tr>`;
+
+      document.getElementById('results').classList.add('visible');
+      document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function reset() {
+      ['principal', 'rate', 'years'].forEach(id => {
+        document.getElementById(id).value = '';
+        document.getElementById(id).classList.remove('error');
+      });
+      ['err-principal', 'err-rate', 'err-years'].forEach(id => {
+        document.getElementById(id).textContent = '';
+      });
+      document.getElementById('results').classList.remove('visible');
+      tableData = [];
+    }
+
+    function exportCSV() {
+      if (!tableData.length) return;
+      const header = 'งวดที่,เงินต้น (บาท),ดอกเบี้ย (บาท),รวม (บาท),คงเหลือ (บาท)\n';
+      const rows   = tableData.map(r =>
+        `${r.month},${r.principalPart.toFixed(2)},${r.interestPart.toFixed(2)},${r.payment.toFixed(2)},${r.balance.toFixed(2)}`
+      ).join('\n');
+      const bom  = '\uFEFF'; // UTF-8 BOM for Excel
+      const blob = new Blob([bom + header + rows], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = 'amortization.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Allow Enter key to trigger calculate
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') calculate();
+    });
+  </script>
+</body>
+</html>
